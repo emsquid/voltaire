@@ -1,5 +1,5 @@
 use crate::{options::Options, result::Result};
-use std::ops::Range;
+use std::{ops::Range, time::Duration};
 
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
@@ -113,6 +113,7 @@ impl Voltaire {
         ];
         let response = client
             .post("https://api.languagetoolplus.com/v2/check")
+            .timeout(Duration::from_secs(5))
             .query(&queries)
             .send()
             .await?
