@@ -8,8 +8,8 @@ mod voltaire;
 async fn main() {
     let options = options::Options::parse();
 
-    match voltaire::Voltaire::from(options.text).await {
-        Ok(voltaire) => voltaire.print(options.verbose),
+    match voltaire::Voltaire::from(&options).await {
+        Ok(voltaire) => voltaire.print(),
         Err(err) => eprintln!("{err}"),
     };
 }
