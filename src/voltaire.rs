@@ -5,6 +5,30 @@ const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[39m";
 
+fn range_utf8(string: &String, mut start: usize, mut end: usize) -> Range<usize> {
+    string.char_indices().for_each(|(pos, ch)| {
+        if pos < start {
+            start = start + (ch.len_utf8() - 1);
+            end = end + (ch.len_utf8() - 1);
+        } else if pos < end {
+            end = end + (ch.len_utf8() - 1);
+        }
+    });
+
+    start..end
+}
+
+fn get_range(string: &String, start: usize, end: usize) -> String {
+    string
+        .get(range_utf8(string, start, end))
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn replace_range(string: &mut String, start: usize, end: usize, with: String) {
+    string.replace_range(range_utf8(string, start, end), &with);
+}
+
 pub struct GrammarError {
     sentence: String,
     position: usize,
@@ -43,17 +67,27 @@ impl GrammarError {
     }
 
     pub fn get_word(&self) -> String {
-        let word = get_range(&self.sentence, self.position, self.position + self.length);
+        let mut word = get_range(&self.sentence, self.position, self.position + self.length);
+        word = word.replace(" ", "_");
+
         format!("{RED}{word}{RESET}")
     }
 
     pub fn get_correction(&self) -> String {
-        let correction = self.replacements[0].clone();
+        let mut correction = self.replacements[0].clone();
+        correction = correction.replace(" ", "_");
+
         format!("{GREEN}{correction}{RESET}")
     }
 
     pub fn get_replacements(&self) -> String {
-        let replacements = self.replacements.join(&format!("{RESET}, {GREEN}"));
+        let replacements = self
+            .replacements
+            .iter()
+            .map(|r| r.replace(" ", "_"))
+            .collect::<Vec<String>>()
+            .join(&format!("{RESET}, {GREEN}"));
+
         format!("{GREEN}{replacements}{RESET}",)
     }
 
@@ -152,28 +186,4 @@ impl Voltaire {
             println!("{}", message);
         }
     }
-}
-
-fn find_range_utf8(string: &String, mut start: usize, mut end: usize) -> Range<usize> {
-    string.char_indices().for_each(|(pos, ch)| {
-        if pos < start {
-            start = start + (ch.len_utf8() - 1);
-            end = end + (ch.len_utf8() - 1);
-        } else if pos < end {
-            end = end + (ch.len_utf8() - 1);
-        }
-    });
-
-    start..end
-}
-
-fn get_range(string: &String, start: usize, end: usize) -> String {
-    string
-        .get(find_range_utf8(string, start, end))
-        .unwrap_or_default()
-        .to_string()
-}
-
-fn replace_range(string: &mut String, start: usize, end: usize, with: String) {
-    string.replace_range(find_range_utf8(string, start, end), &with);
 }
