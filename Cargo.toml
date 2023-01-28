@@ -8,6 +8,6 @@ description = "Who would be better than Voltaire to check (French) grammar"
 
 [dependencies]
 clap = { version = "4.1.4", features = ["derive"] }
-reqwest = { version = "0.11.14", features = ["json"] }
+reqwest = "0.11.14"
 serde_json = "1.0.91"
 tokio = { version = "1.24.2", features = ["full"] }
