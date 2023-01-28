@@ -1,20 +1,20 @@
-use std::ops::Range;
-
 use crate::{options::Options, result::Result};
+use std::ops::Range;
 
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[39m";
 
 pub struct GrammarError {
-    pub position: usize,
-    pub length: usize,
-    pub replacements: Vec<String>,
-    pub message: String,
+    sentence: String,
+    position: usize,
+    length: usize,
+    replacements: Vec<String>,
+    explanation: String,
 }
 
 impl GrammarError {
-    fn from_json(error: &serde_json::Value, options: &Options) -> Option<Self> {
+    pub fn from_json(error: &serde_json::Value, options: &Options) -> Option<Self> {
         let message = error["message"].as_str()?;
         let position = error["offset"].as_i64()?;
         let length = error["length"].as_i64()?;
@@ -26,22 +26,50 @@ impl GrammarError {
         corrections.truncate(options.number as usize);
 
         Some(GrammarError {
+            sentence: options.text.clone(),
             position: position as usize,
             length: length as usize,
             replacements: corrections,
-            message: message.to_string(),
+            explanation: message.to_string(),
         })
+    }
+
+    pub fn get_start(&self) -> usize {
+        self.position
+    }
+
+    pub fn get_end(&self) -> usize {
+        self.position + self.length
+    }
+
+    pub fn get_word(&self) -> String {
+        let word = get_range(&self.sentence, self.position, self.position + self.length);
+        format!("{RED}{word}{RESET}")
+    }
+
+    pub fn get_correction(&self) -> String {
+        let correction = self.replacements[0].clone();
+        format!("{GREEN}{correction}{RESET}")
+    }
+
+    pub fn get_replacements(&self) -> String {
+        let replacements = self.replacements.join(&format!("{RESET}, {GREEN}"));
+        format!("{GREEN}{replacements}{RESET}",)
+    }
+
+    pub fn get_explanation(&self) -> String {
+        self.explanation.clone()
     }
 }
 
 pub struct Voltaire {
     pub sentence: String,
     pub errors: Vec<GrammarError>,
-    pub options: Options,
+    options: Options,
 }
 
 impl Voltaire {
-    async fn get_analysis(sentence: &String) -> Result<serde_json::Value> {
+    pub async fn get_analysis(sentence: &String) -> Result<serde_json::Value> {
         let client = reqwest::Client::new();
         let queries = [
             ("text", sentence.as_str()),
@@ -61,7 +89,7 @@ impl Voltaire {
         Ok(json)
     }
 
-    fn from_analysis(analysis: serde_json::Value, options: &Options) -> Result<Self> {
+    pub fn from_analysis(analysis: serde_json::Value, options: &Options) -> Result<Self> {
         let mut errors = Vec::new();
 
         if let Some(array) = analysis["matches"].as_array() {
@@ -73,6 +101,7 @@ impl Voltaire {
         }
 
         errors.sort_by(|a, b| a.position.partial_cmp(&b.position).unwrap());
+
         Ok(Self {
             sentence: options.text.clone(),
             errors,
@@ -90,10 +119,9 @@ impl Voltaire {
         let mut corrected = self.sentence.clone();
 
         for error in self.errors.iter().rev() {
-            let start = error.position;
-            let end = start + error.length;
-
-            let correction = GREEN.to_owned() + &error.replacements[0] + RESET;
+            let start = error.get_start();
+            let end = error.get_end();
+            let correction = error.get_correction();
 
             replace_range(&mut corrected, start, end, correction);
         }
@@ -106,20 +134,14 @@ impl Voltaire {
         let mut explanations = Vec::new();
 
         for error in self.errors.iter().rev() {
-            let start = error.position;
-            let end = start + error.length;
-
-            let word = format!("{RED}{}{RESET}", get_range(&self.sentence, start, end));
-            let replacements = format!(
-                "{GREEN}{}{RESET}",
-                error.replacements.join(&format!("{RESET}, {GREEN}"))
-            );
+            let start = error.get_start();
+            let end = error.get_end();
+            let word = error.get_word();
+            let replacements = error.get_replacements();
+            let explanation = error.get_explanation();
 
             if self.options.verbose {
-                explanations.push(format!(
-                    "{}: {} -> {}: {}",
-                    start, word, replacements, error.message,
-                ));
+                explanations.push(format!("{start}: {word} -> {replacements}: {explanation}",));
             }
 
             replace_range(&mut styled, start, end, word);
