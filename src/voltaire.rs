@@ -150,28 +150,16 @@ impl Voltaire {
         Voltaire::from_analysis(analysis, options)
     }
 
-    pub fn corrected(&self) -> String {
-        let mut corrected = self.sentence.clone();
-
-        for error in self.errors.iter().rev() {
-            let start = error.get_start();
-            let end = error.get_end();
-            let correction = error.get_correction();
-
-            replace_range(&mut corrected, start, end, correction);
-        }
-
-        corrected
-    }
-
     pub fn print(&self) {
         let mut styled = self.sentence.clone();
+        let mut corrected = self.sentence.clone();
         let mut explanations = Vec::new();
 
         for error in self.errors.iter().rev() {
             let start = error.get_start();
             let end = error.get_end();
             let word = error.get_word();
+            let correction = error.get_correction();
             let replacements = error.get_replacements();
             let explanation = error.get_explanation();
 
@@ -180,11 +168,17 @@ impl Voltaire {
             }
 
             replace_range(&mut styled, start, end, word);
+            replace_range(&mut corrected, start, end, correction);
         }
 
-        println!("{} -> {}", styled, self.corrected());
+        if self.errors.len() == 0 {
+            println!("{GREEN}Great!{RESET}");
+        } else {
+            println!("{RED}I'm disappointed...{RESET}");
+        }
+        println!("{styled} -> {corrected}");
         for message in explanations.iter().rev() {
-            println!("{}", message);
+            println!("{message}");
         }
     }
 }
